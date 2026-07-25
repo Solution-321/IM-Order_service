@@ -1,7 +1,7 @@
 package com.order.service.service;
 
-import com.order.service.entity.Order;
+import com.order.service.entity.OrderEntity;
 
 public interface Invoice {
-    String generateInvoice(Order order);
+    String generateInvoice(OrderEntity order);
 }
