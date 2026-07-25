@@ -8,35 +8,26 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@RequestMapping("/service")
 @RequiredArgsConstructor
 @Slf4j
 public class OrderHandler {
 
     private final OrderManagementService orderManagementService;
 
+    // Keep only the public API required by the spec: POST /service/orders
     @PostMapping("/orders")
     public ResponseEntity<OrderResponse> createOrder(
             @RequestBody @Valid CreateOrder request) {
-        log.info("creating {}, order for: {}",request.getOrderDesc(),request.getCustomerId());
-        return ResponseEntity.ok(orderManagementService.createOrder(request));
-    }
-
-    @PostMapping("/service/orders")
-    public ResponseEntity<OrderResponse> createOrderService(
-            @RequestBody @Valid CreateOrder request) {
-        log.info("REST API: Creating order via /service/orders endpoint for customer: {}",
-                request.getCustomerId());
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(orderManagementService.createOrder(request));
-    }
-
-    @GetMapping("/{orderId}")
-    public ResponseEntity<OrderResponse> getOrder(@PathVariable String orderId) {
-        // future implementation
-        return ResponseEntity.ok(null);
+        log.info("Creating order for customer: {}", request.getCustomerId());
+        var response = orderManagementService.createOrder(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }
 

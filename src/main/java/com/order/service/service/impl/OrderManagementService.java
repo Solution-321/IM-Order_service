@@ -10,14 +10,13 @@ import com.order.service.entity.OrderEntity;
 import com.order.service.entity.OrderLineItem;
 import com.order.service.events.publisher.EventPublisher;
 import com.order.service.repository.OrderRepository;
-import com.order.service.service.PricingStrategy;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -26,8 +25,6 @@ import java.util.List;
 public class OrderManagementService {
 
     private final OrderRepository orderRepository;
-    private final PricingStrategy pricingStrategy;
-    private final InvoiceService invoiceService;
     private final EventPublisher eventPublisher;
     private final CustomerServiceClient customerServiceClient;
     private final ItemServiceClient itemServiceClient;
@@ -43,10 +40,12 @@ public class OrderManagementService {
         // Step b: Validate items and build order items with pricing
         List<OrderItem> validatedItems = validateAndPriceItems(request.getItems());
 
-        // Calculate total price
-        double totalPrice = pricingStrategy.calculateTotal(validatedItems);
+        // Calculate total price (sum price * quantity)
+        double totalPrice = validatedItems.stream()
+                .mapToDouble(i -> (i.getPrice() == null ? 0.0 : i.getPrice()) * (i.getQuantity() == null ? 0 : i.getQuantity()))
+                .sum();
 
-        // Step c: Create and persist OrderEntity
+        // Step c: Create OrderEntity with its line items and persist in one operation
         OrderEntity order = OrderEntity.builder()
                 .customerId(request.getCustomerId())
                 .orderDesc(request.getOrderDesc())
@@ -54,30 +53,22 @@ public class OrderManagementService {
                 .totalPrice(totalPrice)
                 .status(OrderStatus.CREATED)
                 .createdAt(LocalDateTime.now())
-                .lineItems(new ArrayList<>())
                 .build();
 
-        // Save order first to get the ID
-        OrderEntity savedOrder = orderRepository.save(order);
-        log.info("Order persisted with ID: {}", savedOrder.getId());
-
-        // Create and persist line items
-        final OrderEntity orderToReference = savedOrder; // Make final for lambda use
         List<OrderLineItem> lineItems = validatedItems.stream()
                 .map(item -> OrderLineItem.builder()
                         .itemName(item.getItemName())
                         .itemQuantity(item.getQuantity())
-                        .order(orderToReference)
+                        .order(order)
                         .build())
-                .toList();
+                .collect(Collectors.toList());
 
-        savedOrder.setLineItems(lineItems);
-        savedOrder = orderRepository.save(savedOrder);
-        log.info("Line items persisted for Order ID: {}", savedOrder.getId());
+        order.setLineItems(lineItems);
 
-        // Generate Invoice
-        String invoiceId = invoiceService.generateInvoice(savedOrder);
-        log.info("Invoice generated: {} for Order ID: {}", invoiceId, savedOrder.getId());
+        OrderEntity savedOrder = orderRepository.save(order);
+        log.info("Order persisted with ID: {} and {} line items", savedOrder.getId(),
+                savedOrder.getLineItems() == null ? 0 : savedOrder.getLineItems().size());
+
 
         // Publish Kafka event
         eventPublisher.publishOrderCreated(savedOrder);
@@ -93,7 +84,10 @@ public class OrderManagementService {
     private void validateCustomer(Long customerId) {
         log.info("Validating customer with ID: {}", customerId);
         try {
-            var customerResponse = customerServiceClient.getCustomer(customerId);
+            // If the client returns null or throws, treat as validation failure
+            if (customerServiceClient.getCustomer(customerId) == null) {
+                throw new RuntimeException("Customer not found: " + customerId);
+            }
             log.info("Customer validation successful for ID: {}", customerId);
         } catch (Exception e) {
             log.error("Customer validation failed for ID: {}", customerId, e);

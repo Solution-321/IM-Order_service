@@ -1,0 +1,31 @@
+{
+  "namespace": "com.order.service.events.avro",
+  "type": "record",
+  "name": "OrderCreatedEvent",
+  "fields": [
+    {"name": "eventId", "type": "string"},
+    {"name": "eventType", "type": "string"},
+    {"name": "timestamp", "type": "long"},
+    {"name": "data", "type": {
+      "type": "record",
+      "name": "OrderEventData",
+      "fields": [
+        {"name": "orderId", "type": "string"},
+        {"name": "customerId", "type": "long"},
+        {"name": "orderDate", "type": ["null", "string"], "default": null},
+        {"name": "totalPrice", "type": "double"},
+        {"name": "items", "type": {"type": "array", "items": {
+          "type": "record",
+          "name": "OrderItem",
+          "fields": [
+            {"name": "itemName", "type": "string"},
+            {"name": "productId", "type": ["null","string"], "default": null},
+            {"name": "price", "type": "double"},
+            {"name": "quantity", "type": "int"}
+          ]
+        }}}
+      ]
+    }}
+  ]
+}
+

@@ -26,6 +26,8 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       acks: all
       retries: 3
+    properties:
+      schema.registry.url: http://localhost:8081
 
 services:
   customer-service:
